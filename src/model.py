@@ -208,8 +208,7 @@ class CropModel():
                 # 4. Determine leakage loss:
                 # Note: Use the temporary (intermediate) s value 
                 # for this calculation rather than s[t]
-                self.L[t] = self.soil.calc_L(
-                    _s, units='mm/day')
+                self.L[t] = self.soil.calc_D(_s)
 
                 # 5. Update Soil Moisture Water Balance (Part 2)
                 self.dsdt[t] = rainfall - self.Q[t] - self.ET[t] - self.L[t]
@@ -388,8 +387,7 @@ class ZeroECropModel(CropModel):
                     # 4. Determine leakage loss:
                     # Note: Use the temporary (intermediate) s value 
                     # for this calculation rather than s[t]
-                    self.L[t] = self.soil.calc_L(
-                        _s, units='mm/day')
+                    self.L[t] = self.soil.calc_D(_s)
 
                     # 5. Update Soil Moisture Water Balance (Part 2)
                     self.dsdt[t] = rainfall - self.Q[t] - self.ET[t] - self.L[t]

@@ -38,7 +38,7 @@ climate= Climate(
         ET_max=ETmax, 
         q_e = q_e
         )
-plant = StaticCrop(soil=soil)
+plant = StaticCrop(soil=soil, q_t=1.5)
 
 cropmodel = ZeroECropModel(soil=soil,
             climate=climate,
@@ -95,12 +95,14 @@ ax1.set_xlabel='Day of season [day]'
 # =======================================
 # Figure b: Soil moisture timeseries from simulation
 s = output['s']
+s_sorted = np.sort(s)
 _sstar = plant.s_star
 _sw = plant.sw
 s.index = s.index + 1 # zero-indexed --> day of the season 
 
 porosity = Soil(texture).n 
 theta = s * porosity
+theta_sorted= np.sort(theta)
 _theta_star = plant.s_star*porosity
 _theta_sw = plant.sw*porosity
 
@@ -118,7 +120,8 @@ ax2.set_xlabel('Day of season [day]')
 # =======================================
 # Figure c: Soil moisture loss function
 
-ax3.plot(theta, [plant.calc_T(x, LAI=1.5) for x in s], '-', linewidth=2)
+# ax3.plot(theta_sorted, [plant.calc_T(x, LAI=1.5) for x in s_sorted], '-', linewidth=2)
+ax3.plot(theta_sorted, [soil.calc_Q(x)+soil.calc_D(x)+plant.calc_T(x, LAI=1.5) for x in s_sorted], '-', linewidth=2)
 ax3.set_xlabel(r'Soil moisture, $\theta$') 
 ax3.set_ylabel(r'Loss rate, $-d\theta/dt$ [mm/day]') 
 ax3.set_ylim(-0.1,5.5)

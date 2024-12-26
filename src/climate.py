@@ -6,11 +6,10 @@ natasha, Kelly Caylor, Noah Spahn, & Bryn Morgan. (2021). ecohydro/maize-Toff: F
 
 """
 
-#%% Climate Class Definition
+#%% 
 import numpy as np
 from numpy.random import exponential, uniform
 from dateutil.relativedelta import *
-from datetime import timedelta, datetime
 
 class Climate():
 
@@ -47,7 +46,7 @@ class Climate():
         self.rainfall = self.generate(self.alpha_r, self.lambda_r)
 
 
-    def calc_E(self, s, LAI=None, sh=None): 
+    def calc_E(self, s, LAI=None, sh=None, k=0.5): 
         """ Determines the daily evaporation as a function of relative soil moisture
 
         Usage: calc_E(s)
@@ -56,10 +55,11 @@ class Climate():
 
         """
         if LAI == None:
-            raise ValueError("Climate calc_E expects LAI that's not None.")
-
-        k = 0.5
-        E_max_p = self.ET_max*np.exp(-k*LAI) 
+            # raise ValueError("Climate calc_E expects LAI that's not None.")
+            E_max_p = self.ET_max * k
+        else:
+            E_max_p = self.ET_max*np.exp(-k*LAI) 
+            
         if s >= sh:
             return pow((s-sh)/(1-sh), self.q_e)*E_max_p
         else:
