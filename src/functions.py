@@ -1,34 +1,65 @@
-# %%
 import numpy as np
 
 ###################################################################################
+###################################################################################
 # LOSS FUNCTION
+###################################################################################
 ###################################################################################
 
 
-def lossfunc_3stage(theta, ETmax, Ks, beta, n, theta_fc, theta_star, theta_w, q=1.0, z=50):
+def lossfunc_3stage(
+    theta, ETmax, Ks, beta, n, theta_fc, theta_star, theta_w, q=1.0, z=50
+):
     """
-    Calculate the loss value (-dtheta/dt) corresponding to the soil moisture level (theta).
+    Computes the loss value (-dtheta/dt) for a given soil moisture level (theta)
+    based on a three-stage soil moisture loss model.
+
+    This model assumes three distinct stages of soil moisture dynamics:
+    1. **Drainage**: Occurs when soil moisture is above the field capacity (theta > theta_fc).
+        Loss is dominated by gravitational drainage.
+    2. **Stage I ET (Evapotranspiration)**: Occurs when soil moisture is between the field capacity
+        and the critical moisture level (theta_fc >= theta > theta_star).
+        Loss is dominated by atmospheric demand, with potential evapotranspiration at its maximum (ETmax).
+    3. **Stage II ET (Evapotranspiration)**: Occurs when soil moisture is between the critical moisture
+        level and the wilting point (theta_star >= theta > theta_w). Loss is limited by soil moisture availability,
+        transitioning to a non-linear reduction in evapotranspiration.
+
+    Hygroscopic water (soil moisture below theta_w) is neglected in this model.
 
     Parameters:
-    - theta: Current soil moisture level.
-    - ETmax: Maximum evapotranspiration rate.
-    - Ks: Saturated hydraulic conductivity.
-    - beta: Parameter b.
-    - n: Porosity.
-    - theta_fc: Field capacity saturation.
-    - theta_star: Critical soil moisture content.
-    - theta_w: Wilting point soil moisture content.
-    - q: nonlinearity parameter
-    - z: Soil thickness in mm (default is 50 mm).
+    ----------
+    theta : float
+        Current soil moisture level (m³/m³).
+    ETmax : float
+        Maximum evapotranspiration rate (mm/day).
+    Ks : float
+        Saturated hydraulic conductivity (mm/day).
+    beta : float
+        Soil moisture stress parameter (dimensionless).
+    n : float
+        Soil porosity (m³/m³).
+    theta_fc : float
+        Field capacity, the soil moisture level at which drainage effectively ceases (m³/m³).
+    theta_star : float
+        Critical soil moisture content for transition between stages (m³/m³).
+    theta_w : float
+        Wilting point soil moisture content, below which plants cannot extract water (m³/m³).
+    q : float, optional
+        Nonlinearity parameter (dimensionless), default is 1.0.
+    z : float, optional
+        Soil thickness (mm), default is 50 mm.
 
     Returns:
-    - loss: Calculated loss based on theta's range.
+    -------
+    float
+        The calculated loss value (-dtheta/dt) (m³/m³/day).
     """
 
     if theta >= theta_fc:
         # Drainage stage
-        return loss_drainage(theta=theta, Ks=Ks, beta=beta, n=n, theta_fc=theta_fc, z=z) + loss_ET_stageI(ETmax=ETmax, z=z)
+        return loss_drainage(
+            theta=theta, Ks=Ks, beta=beta, n=n, theta_fc=theta_fc, z=z
+        ) + loss_ET_stageI(ETmax=ETmax, z=z)
 
     elif theta_star <= theta < theta_fc:
         # Stage I ET
@@ -36,7 +67,9 @@ def lossfunc_3stage(theta, ETmax, Ks, beta, n, theta_fc, theta_star, theta_w, q=
 
     elif theta_w <= theta < theta_star:
         # Stage II ET
-        return loss_ET_stageII(theta=theta, ETmax=ETmax, theta_star=theta_star, theta_w=theta_w, q=q, z=z)
+        return loss_ET_stageII(
+            theta=theta, ETmax=ETmax, theta_star=theta_star, theta_w=theta_w, q=q, z=z
+        )
 
     elif theta < theta_w and theta >= 0:
         # Below the wilting point, minimal or no loss
@@ -47,56 +80,106 @@ def lossfunc_3stage(theta, ETmax, Ks, beta, n, theta_fc, theta_star, theta_w, q=
         return np.nan
 
 
+###################################################################################
+# LOSS MODELS (EACH STAGE)
+
+
 def loss_drainage(theta, Ks, beta, theta_fc, n, z=50):
+    """
+    Computes the loss value (-dtheta/dt) for a given soil moisture level (theta) in Drainage stage.
+    """
     return -(Ks / z) * (
-        (np.exp(beta * (theta - theta_fc)) - 1) /
-        (np.exp(beta * (n - theta_fc)) - 1)
+        (np.exp(beta * (theta - theta_fc)) - 1) / (np.exp(beta * (n - theta_fc)) - 1)
     )
 
 
 def loss_ET_stageI(ETmax, z=50.0):
+    """
+    Computes the loss value (-dtheta/dt) for a given soil moisture level (theta) in Stage I ET.
+    """
     return -(ETmax / z)
 
 
 def loss_ET_stageII(theta, ETmax, theta_star, theta_w, q=1.0, z=50.0):
+    """
+    Computes the loss value (-dtheta/dt) for a given soil moisture level (theta) in Stage II ET.
+    """
     return -(ETmax / z) * ((theta - theta_w) / (theta_star - theta_w)) ** q
 
 
 ###################################################################################
+###################################################################################
 # DRYDOWN MODELS
+###################################################################################
 ###################################################################################
 
 
 def theta_3stage(
     t,
-    ETmax,
     theta_0,
-    theta_w,
-    theta_star,
-    theta_fc,
+    ETmax,
     Ks,
     beta,
     n,
+    theta_w,
+    theta_star,
+    theta_fc,
     q=1.0,
     z=50.0,
     penalty=0.5,
 ):
     """
-    Calculate the drydown curve for soil moisture over time using non-linear plant stress model.
+    Computes the soil moisture (theta) at a given timestep (t) based on a three-stage
+    drydown curve model for soil moisture dynamics.
+
+    This model incorporates three stages of soil moisture dynamics:
+    1. **Drainage**: Occurs when soil moisture (theta) is greater than the field capacity (theta > theta_fc).
+        Loss is dominated by gravitational drainage.
+    2. **Stage I ET (Evapotranspiration)**: Occurs when theta lies between field capacity and the
+        critical soil moisture content (theta_fc >= theta > theta_star). Loss is primarily determined
+        by atmospheric demand, with evapotranspiration occurring at its maximum rate (ETmax).
+    3. **Stage II ET (Evapotranspiration)**: Occurs when theta is between the critical soil moisture
+        content and the wilting point (theta_star >= theta > theta_w). Loss is constrained by soil moisture
+        availability, with evapotranspiration reducing non-linearly.
+
+    Hygroscopic water (below wilting point, theta_w) is excluded from this model.
 
     Parameters:
-        t (int): Timestep, in day.
-        z (float): Soil thicness in mm. Default is 50 mm
-        ETmax (float): Maximum evapotranpisration rate in mm/day.
-        q (float): Degree of non-linearity in the soil moisture response.
-        theta_0 (float): The initial soil moisture after precipitation, in m3/m3
-        theta_star (float, optional): Critical soil moisture content, equal to s_star * porosity, in m3/m3
-        theta_w (float, optional): Wilting point soil moisture content, equal to s_star * porosity, in m3/m3
+    ----------
+    t : int
+        Timestep, in days.
+    theta_0 : float
+        Initial soil moisture after precipitation, in m³/m³.
+    ETmax : float
+        Maximum evapotranspiration rate, in mm/day.
+    Ks : float
+        Saturated hydraulic conductivity, in mm/day.
+    beta : float
+        Soil moisture stress parameter (dimensionless).
+    n : float
+        Soil porosity, in m³/m³.
+
+    theta_w : float
+        Wilting point soil moisture content, equal to s_w * porosity, in m³/m³.
+    theta_star : float
+        Critical soil moisture content, equal to s_star * porosity, in m³/m³.
+    theta_fc : float
+        Field capacity soil moisture content, in m³/m³.
+    q : float, optional
+        Degree of non-linearity in the soil moisture response (dimensionless). Default is 1.0.
+    z : float, optional
+        Soil thickness, in mm. Default is 50 mm.
+    penalty : float, optional
+        Penalty parameter for failed estimation. Default is 0.5.
 
     Returns:
-        float: Rate of change in soil moisture (dtheta/dt) for the given timestep, in m3/m3/day.
+    -------
+    float
+        Soil moisture content (theta) at the given timestep, in m³/m³.
     """
-    # ______________________________________________________________
+
+    # ______________________________________________________________\
+    # Parameter checks
     if (theta_0 <= theta_w) or (theta_star <= theta_w) or (theta_star >= theta_fc):
         return np.full_like(t, penalty)
 
@@ -104,40 +187,37 @@ def theta_3stage(
         return np.full_like(t, penalty)
 
     # ______________________________________________________________
-    # Get the time range
+    # Calculate Time Ranges for Each Stage
 
-    # If theta_0 is in drainage stage (larger than theta_fc),
-    # find the time to reach theta_fc and theta_star
-    if theta_0 >= theta_fc:
-        try:
+    try:
+        if theta_0 >= theta_fc:  # Stage: Drainage
             t_fc = find_t_fc(
-                ETmax=ETmax, Ks=Ks, beta=beta, theta_fc=theta_fc, theta_0=theta_0, n=n, z=z)
-            t_star = find_t_star(ETmax=ETmax, theta_0=theta_fc,
-                                 theta_star=theta_star) + t_fc
-        except Exception as e:
-            # Catch any unexpected errors and set t_fc to NaN
-            print(f"Error in finding t_fc: {e}")
-            return np.full_like(t, penalty)
+                theta_0=theta_0,
+                ETmax=ETmax,
+                Ks=Ks,
+                beta=beta,
+                n=n,
+                theta_fc=theta_fc,
+                z=z,
+            )
+            t_star = (
+                find_t_star(theta_0=theta_fc, ETmax=ETmax, theta_star=theta_star) + t_fc
+            )
 
-    # If theta_0 is in stage I (smaller than theta_fc but larger than theta_star),
-    # find the time to reach theta_star
-    elif (theta_0 > theta_star) & (theta_0 < theta_fc):
-        try:
+        elif theta_0 > theta_star:  # Stage: Stage I ET
             t_fc = 0
-            t_star = find_t_star(
-                ETmax=ETmax, theta_0=theta_0, theta_star=theta_star)
-        except Exception as e:
-            # Catch any unexpected errors and set t_fc to NaN
-            print(f"Error in finding t_fc: {e}")
-            return np.full_like(t, penalty)
+            t_star = find_t_star(theta_0=theta_0, ETmax=ETmax, theta_star=theta_star)
 
-    # If theta_0 is smaller than theta_star, theta_0 is in stage II ET at t=0
-    else:
-        t_fc = 0
-        t_star = 0
+        else:  # Stage: Stage II ET
+            t_fc = 0
+            t_star = 0
+
+    except Exception as e:
+        print(f"Error in calculating time ranges: {e}")
+        return np.full_like(t, penalty)
 
     # ______________________________________________________________
-    # Get the theta_0 for each stage
+    # Get the initial soil mositure values entring into each stage
     if theta_0 > theta_fc:
         theta_0_i = theta_fc
     else:
@@ -155,16 +235,27 @@ def theta_3stage(
         [t < t_fc, (t >= t_fc) & (t < t_star), t >= t_star],
         [
             lambda t: theta_drainage(
-                t=t, ETmax=ETmax, Ks=Ks, beta=beta, theta_fc=theta_fc, theta_0=theta_0, n=n),
-            lambda t: theta_ET_stageI(
-                t=t, ETmax=ETmax, theta_0=theta_0_i, t_fc=t_fc),
-            lambda t: theta_ET_expmodel(
                 t=t,
+                ETmax=ETmax,
+                Ks=Ks,
+                beta=beta,
+                theta_fc=theta_fc,
+                theta_0=theta_0,
+                n=n,
+                z=z,
+            ),
+            lambda t: theta_ET_stageI(
+                t=t, ETmax=ETmax, theta_0=theta_0_i, t_fc=t_fc, z=z
+            ),
+            lambda t: theta_ET_stageII(
+                t=t,
+                q=q,
                 ETmax=ETmax,
                 theta_0=theta_0_ii,
                 theta_star=theta_star,
                 theta_w=theta_w,
                 t_star=t_star,
+                z=z,
             ),
         ],
     )
@@ -172,43 +263,38 @@ def theta_3stage(
     return theta_t
 
 
-def find_t_fc(ETmax, Ks, beta, theta_fc, theta_0, n, z=50):
+###################################################################################
+# TIME FUNCTIONS
+
+
+def find_t_fc(theta_0, ETmax, Ks, beta, n, theta_fc, z=50):
+    """This function computes the time (t_fc) required for the soil moisture level (theta_0)
+    to decrease to the field capacity soil moisture content (theta_fc) during Drainage Stage.
+    """
     eta = ETmax / z
     m = Ks / (z * (np.exp(beta * (n - theta_fc)) - 1))
-
-    # Second equation for t_sfc
     ln_term = np.log((eta - m + m * np.exp(beta * (theta_0 - theta_fc))) / eta)
     t_fc = (1 / (beta * (m - eta))) * (beta * (theta_fc - theta_0) + ln_term)
 
     return t_fc
 
 
-def find_t_star(ETmax, theta_0, theta_star, z=50):
-    k = (
-        ETmax / z
-    )  # Constant term. Convert ETmax to maximum dtheta/dt rate from a unit volume of soil
-
-    # Time it takes from theta_0 to theta_star
+def find_t_star(theta_0, ETmax, theta_star, z=50):
+    """This function computes the time (t_star) required for the soil moisture level (theta_0)
+    to decrease to the critical soil moisture content (theta_star) during Stage I evapotranspiration.
+    """
+    k = ETmax / z
     t_star = (theta_0 - theta_star) / k
     return t_star
 
 
-def theta_drainage(t, ETmax, Ks, beta, theta_fc, theta_0, n, z=50):
+###################################################################################
+# DRYDOWN MODELS (EACH STAGE)
+
+
+def theta_drainage(t, theta_0, ETmax, Ks, n, beta, theta_fc, z=50):
     """
-        Compute the value of s(t) based on the analytical solution of the differential equation.
-
-        Parameters:
-        - t: Time variable (scalar or NumPy array)
-        - ETmax: Potential Evapotranspiration (scalar)
-        - def compute_s(t, ETmax, Ks, b, theta_fc, theta_0):
-    : Hydraulic conductivity constant (scalar)
-        - beta: Parameter b in the equation (scalar)
-        - theta_fc: Field capacity saturation (scalar)
-        - theta_0: Initial saturation at time t=0 (scalar)
-        - n: porosity
-
-        Returns:
-        - theta_t: Value(s) of s at time t (scalar or NumPy array matching the shape of t)
+    Calculate the drydown curve for soil moisture over time in Drainage Stage.
     """
 
     # Compute constants
@@ -230,15 +316,57 @@ def theta_drainage(t, ETmax, Ks, beta, theta_fc, theta_0, n, z=50):
     return theta_t
 
 
-def theta_ET_stageI(t, ETmax, theta_0, t_fc=0.0, z=50):
+def theta_ET_stageI(t, theta_0, ETmax, t_fc=0.0, z=50):
+    """
+    Calculate the drydown curve for soil moisture over time in Stage II ET.
+    """
     return theta_0 - (ETmax / z) * (t - t_fc)
 
 
-def theta_ET_qmodel(t, q, ETmax, theta_0, theta_star, theta_w, z=50.0, t_star=0.0):
+def theta_ET_stageII(t, theta_0, ETmax, theta_star, theta_w, q=1.0, z=50.0, t_star=0.0):
+    """
+    Calculate the drydown curve for soil moisture over time in Stage II ET.
+    """
 
-    k = (
-        ETmax / z
-    )  # Constant term. Convert ETmax to maximum dtheta/dt rate from a unit volume of soil
+    if q == 1.0:
+        return theta_ET_expmodel(
+            t=t,
+            theta_0=theta_0,
+            ETmax=ETmax,
+            theta_star=theta_star,
+            theta_w=theta_w,
+            z=z,
+            t_star=t_star,
+        )
+    else:
+        return theta_ET_qmodel(
+            t=t,
+            theta_0=theta_0,
+            ETmax=ETmax,
+            theta_star=theta_star,
+            theta_w=theta_w,
+            q=q,
+            z=z,
+            t_star=t_star,
+        )
+
+
+def theta_ET_expmodel(t, theta_0, ETmax, theta_star, theta_w, z=50.0, t_star=0.0):
+    """
+    Calculate the drydown curve for soil moisture over time in Stage II ET using linear plant stress model (q=1).
+    """
+
+    tau = z * (theta_star - theta_w) / ETmax
+
+    return (theta_0 - theta_w) * np.exp(-(t - t_star) / tau) + theta_w
+
+
+def theta_ET_qmodel(t, theta_0, ETmax, theta_star, theta_w, q, z=50.0, t_star=0.0):
+    """
+    Calculate the drydown curve for soil moisture over time in Stage II ET using non-linear plant stress model (q!=1).
+    """
+
+    k = ETmax / z
 
     b = (theta_0 - theta_w) ** (1 - q)
 
@@ -247,29 +375,3 @@ def theta_ET_qmodel(t, q, ETmax, theta_0, theta_star, theta_w, z=50.0, t_star=0.
     base = -k * a * (t - t_star) + b
 
     return base ** (1 / (1 - q)) + theta_w
-
-
-def theta_ET_expmodel(t, ETmax, theta_0, theta_star, theta_w, z=50.0, t_star=0.0):
-    """
-    Calculate the drydown curve for soil moisture over time using non-linear plant stress model.
-
-    Parameters:
-        t (int): Timestep, in day.
-        z (float): Soil thicness in mm. Default is 50 mm
-        ETmax (float): Maximum evapotranpisration rate in mm/day.
-        theta_0 (float): The initial soil moisture after precipitation, in m3/m3
-        theta_star (float, optional): Critical soil moisture content, equal to s_star * porosity, in m3/m3
-        theta_w (float, optional): Wilting point soil moisture content, equal to s_star * porosity, in m3/m3
-
-    Returns:
-        float: Rate of change in soil moisture (dtheta/dt) for the given timestep, in m3/m3/day.
-    """
-
-    tau = z * (theta_star - theta_w) / ETmax
-
-    if theta_0 > theta_star:
-        theta_0_ii = theta_star
-    else:
-        theta_0_ii = theta_0
-
-    return (theta_0_ii - theta_w) * np.exp(-(t - t_star) / tau) + theta_w
