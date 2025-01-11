@@ -80,7 +80,7 @@ k = ETmax / z  # Normalized ETmax rate per soil depth
 delta = 1e-03
 theta_base = np.arange(0, n, delta)
 theta_0_base = 0.6
-tmax_base = 15
+tmax_base = 10
 t_base = np.arange(0, tmax_base, delta)
 
 # Drainage stage
@@ -106,7 +106,7 @@ t_fc_base = find_t_fc(
     ETmax=ETmax, Ks=Ks, beta=beta, theta_fc=theta_fc, theta_0=theta_0_base, n=n, z=z
 )
 t_star_base = (
-    find_t_star(theta_0=theta_0_base, ETmax=ETmax, theta_star=theta_star) + t_fc_base
+    find_t_star(theta_0=theta_fc, ETmax=ETmax, theta_star=theta_star) + t_fc_base
 )
 
 dd_values_base = [
@@ -146,15 +146,11 @@ def update(frame):
     t_Delta = (frame + 1) * 0.02  # Increment for each frame
     t_ET = np.arange(t_fc_base, t_fc_base + t_Delta, 1e-2)
 
-    # Check exit conditions
-    if t_Delta > t_star_base:
-        return []
-
     # _________________________________________________________________________________
     # DRAINAGE STAGE PLOT
     dd_values_ET = np.piecewise(
         t_ET,
-        [(t_ET >= t_fc_base) & (t_ET < t_star_base), t_ET >= t_star_base],
+        [t_ET < t_star_base, t_ET >= t_star_base],
         [
             lambda t: theta_ET_stageI(
                 t=t, ETmax=ETmax, theta_0=theta_fc, t_fc=t_fc_base, z=z
@@ -172,11 +168,15 @@ def update(frame):
         ],
     )
 
+    # Check exit conditions
+    if dd_values_ET[-1] < theta_w:
+        return []
+
     theta_ET = np.arange(dd_values_ET[-1], theta_fc, 1e-03)
 
     loss_values_ET = np.piecewise(
         theta_ET,
-        [(theta_ET >= theta_star) & (theta_ET < theta_fc), theta_ET <= theta_star],
+        [theta_ET > theta_star, theta_ET <= theta_star],
         [
             lambda theta: loss_ET_stageI(ETmax=ETmax),
             lambda theta: loss_ET_stageII(
@@ -266,7 +266,7 @@ def update(frame):
 
 # _________________________________________________________________________________
 # Create animation
-ani = FuncAnimation(fig, update, frames=200, interval=25, blit=False)
+ani = FuncAnimation(fig, update, frames=400, interval=25, blit=False)
 # frames: The total number of frames for the animation.
 # interval: The time between frames in milliseconds(e.g., interval=50 for 20 FPS)
 
@@ -276,5 +276,5 @@ out_ETir = "./out"
 if not os.path.exists(out_ETir):
     os.mkdir(out_ETir)
 out_filename = "ET.gif"
-ani.save(os.path.join(out_ETir, out_filename), writer="pillow", dpi=60)
+ani.save(os.path.join(out_ETir, out_filename), writer="pillow", dpi=300)
 print(f"Drainage stage animation was saved to: {os.path.join(out_ETir, out_filename)}")

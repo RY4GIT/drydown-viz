@@ -78,7 +78,7 @@ k = ETmax / z  # Normalized ETmax rate per soil depth
 delta = 1e-03
 theta_base = np.arange(0, n, delta)
 theta_0_base = 0.6
-tmax_base = 15
+tmax_base = 10
 t_base = np.arange(0, tmax_base, delta)
 
 # Drainage stage
