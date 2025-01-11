@@ -129,7 +129,7 @@ dd_values_base = [
 # _________________________________________________________________________________
 # Set up figure
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4))
-ET_color = "#809D3C"
+ET_color = "#5DB996"
 base_color = "#D3D3D3"
 linewidth = 3
 
