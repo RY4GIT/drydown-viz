@@ -253,6 +253,6 @@ ani = FuncAnimation(fig, update, frames=200, interval=25, blit=False)
 out_dir = "./out"
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
-out_filename = "drainage.gif"
+out_filename = "soil_drainage.gif"
 ani.save(os.path.join(out_dir, out_filename), writer="pillow", dpi=300)
 print(f"Drainage stage animation was saved to: {os.path.join(out_dir, out_filename)}")
