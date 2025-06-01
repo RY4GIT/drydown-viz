@@ -409,3 +409,5 @@ if not os.path.exists(out_dir):
 out_filename = "soil_est_ver2.gif"
 ani.save(os.path.join(out_dir, out_filename), writer="pillow", dpi=300)
 print(f"Drainage stage animation was saved to: {os.path.join(out_dir, out_filename)}")
+
+# %%

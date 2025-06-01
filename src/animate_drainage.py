@@ -26,7 +26,7 @@ import matplotlib as mpl
 
 plt.rcParams["font.family"] = "DejaVu Sans"
 plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
-mpl.rcParams["font.size"] = 14.0
+mpl.rcParams["font.size"] = 12.0
 mpl.rcParams["axes.titlesize"] = 12.0
 plt.rcParams["mathtext.fontset"] = "stixsans"
 
@@ -78,7 +78,7 @@ k = ETmax / z  # Normalized ETmax rate per soil depth
 delta = 1e-03
 theta_base = np.arange(0, n, delta)
 theta_0_base = 0.6
-tmax_base = 10
+tmax_base = 15
 t_base = np.arange(0, tmax_base, delta)
 
 # Drainage stage
@@ -123,7 +123,7 @@ dd_values_base = [
 # %%
 # _________________________________________________________________________________
 # Set up figure
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4))
+fig, (ax2, ax1) = plt.subplots(1, 2, figsize=(9, 4))
 D_color = "#81BFDA"
 base_color = "#D3D3D3"
 linewidth = 3
@@ -193,7 +193,7 @@ def update(frame):
         xlabel=f"{theta_vardict['label']} {theta_vardict['unit']}",
         ylabel=f"{var_dict['dtheta']['label']} {var_dict['dtheta']['unit']}",
     )
-    ax1.set_title("Loss function space", loc="left")
+    # ax1.set_title("Loss function", loc="left", fontweight="bold")
     ax1.set_xticks(
         [theta_w, theta_star, theta_fc, n],
         [r"$\theta_{\mathrm{wp}}$", r"$\theta^{*}$", r"$\theta_{\mathrm{fc}}$", r"$n$"],
@@ -222,6 +222,7 @@ def update(frame):
     # Adjustment
     ax2.set_ylim([0.0, n])
     ax2.set_xlim([0, tmax_base])
+    ax2.set_xticks(np.arange(0, tmax_base + 1, 5))
     ax2.set(
         xlabel=f"{var_dict['t']['label']} {var_dict['t']['unit']}",
         ylabel=f"{theta_vardict['label']} {theta_vardict['unit']}",
@@ -230,7 +231,7 @@ def update(frame):
         [theta_w, theta_star, theta_fc, n],
         [r"$\theta_{\mathrm{wp}}$", r"$\theta^{*}$", r"$\theta_{\mathrm{fc}}$", r"$n$"],
     )
-    ax2.set_title("Drydown space", loc="left")
+    # ax2.set_title("Drydown", loc="left", fontweight="bold")
 
     ax1.spines["top"].set_visible(False)
     ax1.spines["right"].set_visible(False)
